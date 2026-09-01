@@ -38,7 +38,7 @@ export const registerUser = async (req, res) => {
 
         })
 
-        res.status(201).json({ message: 'User Registred', user: newUser })
+        res.status(201).json({ message: 'User Registered', user: newUser })
 
     } catch (error) {
         res.status(500).json({ message: 'Server crashed', error: error.message })
