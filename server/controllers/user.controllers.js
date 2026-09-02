@@ -1,6 +1,7 @@
 // register controller
 import User from "../models/user.model.js"
 import bcrypt from 'bcrypt'
+import genToken from "../utils/generateToken.js"
 
 
 export const registerUser = async (req, res) => {
@@ -46,6 +47,12 @@ export const registerUser = async (req, res) => {
 
         })
 
+        const token = genToken(newUser._id)
+
+        console.log(token)
+
+
+
         res.status(201).json({ message: 'User Registered', user: newUser })
 
     } catch (error) {
@@ -79,15 +86,15 @@ export const loginUser = async (req, res) => {
         const passwordMatched = await bcrypt.compare(password, user.password)
 
 
-        if(!passwordMatched){
-            res.status(401).json({ message: 'Password Did not match' })
+        if (!passwordMatched) {
+            return res.status(401).json({ message: 'Password Did not match' })
         }
 
         console.log(passwordMatched)
 
         res.status(200).json({ message: 'User Logged In' })
 
-} catch (error) {
+    } catch (error) {
         res.status(500).json({ message: 'Server crashed', error: error.message })
     }
 }
