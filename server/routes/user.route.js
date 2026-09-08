@@ -9,6 +9,8 @@ userRoutes.post('/register', registerUser)
 userRoutes.post('/login', loginUser)
 userRoutes.get('/me' , isAuthenticated ,getMe )
 
+// Implement log out route
+
 
 
 
