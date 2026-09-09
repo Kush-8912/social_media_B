@@ -1,7 +1,45 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { axiosInstance } from '../axiosCalls/axios'
+
+
 
 function Login() {
+  const [form, setForm] = useState({ email: "", password: "" })
+  const [loader, setLoader] = useState(false)
+  const [err, setErr] = useState(null)
+
+
+    const navigate = useNavigate()
+
+  const handleChange = (e) => {
+      setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+
+  const handleSubmit = async (e) => {
+      e.preventDefault()
+      setLoader(true)
+      try {
+          const res = await axiosInstance.post('/users/login', form)
+
+          console.log(res)
+          setLoader(false)
+          console.log('User Logged in')
+          navigate('/home')
+
+      } catch (error) {
+          setLoader(false)
+          // setErr(error.message)
+          console.log(error.message)
+
+      }
+  }
+
+
+
+
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans antialiased">
       {/* Header / Logo Area */}
@@ -20,11 +58,6 @@ function Login() {
         <div className="bg-white py-8 px-6 shadow-sm ring-1 ring-slate-900/5 sm:rounded-2xl sm:px-10">
           <form className="space-y-4">
             
-            {/* Name Field */}
-       
-
-            {/* Username Field */}
-            
 
             {/* Email Field */}
             <div>
@@ -35,6 +68,7 @@ function Login() {
                 id="email" 
                 name="email" 
                 type="email" 
+                onChange={handleChange}
                 placeholder="alex@example.com"
                 className="w-full rounded-xl border-0 py-2.5 px-3.5 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-slate-900 text-sm transition-all duration-150 outline-none"
               />
@@ -49,6 +83,7 @@ function Login() {
                 id="password" 
                 name="password" 
                 type="password" 
+                onChange={handleChange}
                 placeholder="••••••••"
                 className="w-full rounded-xl border-0 py-2.5 px-3.5 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-slate-900 text-sm transition-all duration-150 outline-none"
               />
@@ -58,6 +93,7 @@ function Login() {
             <div className="pt-2">
               <button 
                 type="button" 
+                onClick={handleSubmit}
                 className="w-full flex justify-center py-3 px-4 rounded-xl text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 active:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 transition-all duration-150 shadow-sm cursor-pointer"
               >
                Log in
