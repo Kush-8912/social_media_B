@@ -11,9 +11,8 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         const fetchUser = async () => {
-            const user = await axiosInstance.get('/users/me')
-
-            console.log(user)
+            const userData = await axiosInstance.get('/users/me')
+            setUser(userData.data.authenticatedUser)
         }
 
         fetchUser()
@@ -21,9 +20,9 @@ export const AuthProvider = ({ children }) => {
 
 
     return (
-        <AuthProvider>
+        <AuthContext.Provider value={{user}}>
           {children}  
-        </AuthProvider>
+        </AuthContext.Provider>
     )
 
 

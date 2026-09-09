@@ -4,25 +4,28 @@ import Signup from "./Pages/Signup"
 import Home from "./Pages/Home"
 import Landing from "./Pages/Landing"
 import { AuthProvider } from "./context/AuthContext"
+import PublicRoute from "./components/PublicRoute"
+import ProtectedRoute from "./components/ProtectedRoute"
 
 function App() {
 
 
   return (
-  
+
     <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/home" element={<Home />} />
-          </Routes>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
+          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+          <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+        </Routes>
 
 
-        </BrowserRouter>
-        </AuthProvider>
-  
+      </BrowserRouter>
+    </AuthProvider>
+
+
 
   )
 }
