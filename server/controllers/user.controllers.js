@@ -138,3 +138,59 @@ export const getUserProfile = async (req, res) => {
     }
 }
 
+export const followUser = async (req, res) => {
+    try {
+        const currentUserId = req.user._id // alex
+        const targetUserId = req.params.id // steve
+
+
+        if (currentUserId.toString() === targetUserId.toString()) {
+            return res.status(409).json({ message: 'you cannot follow YourSelf' })
+        }
+        // addToSet
+
+        // if current user is already follwing targetUser
+        //
+
+        await User.findByIdAndUpdate(currentUserId, { $addToSet: { following: targetUserId } })
+
+        await User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUserId } })
+
+
+      res.status(200).send({message : "user Followed"})
+
+
+    } catch (error) {
+        res.status(500).json({ message: 'Server crashed', error: error.message })
+    }
+}
+
+
+export const unFollowUser = async (req, res) => {
+    try {
+        const currentUserId = req.user._id // alex
+        const targetUserId = req.params.id // steve
+
+
+        if (currentUserId.toString() === targetUserId.toString()) {
+            return res.status(409).json({ message: 'you cannot unfollow YourSelf' })
+        }
+        // addToSet
+
+        // if current user is already follwing targetUser
+        //
+
+        await User.findByIdAndUpdate(currentUserId, { $pull: { following: targetUserId } })
+
+        await User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUserId } })
+
+
+        res.status(200).send({message : "user Unfollowed"})
+
+
+    } catch (error) {
+        res.status(500).json({ message: 'Server crashed', error: error.message })
+    }
+}
+
+
