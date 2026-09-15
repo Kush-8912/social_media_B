@@ -6,21 +6,21 @@ import { axiosInstance } from '../axiosCalls/axios'
 
 function Profile() {
     const { user } = useAuth()
-     const params = useParams()
+     const {username} = useParams()
 
-     console.log(params)
+     const [userData , setUserData] = useState(null)
 
 
     useEffect(() => {
         const fetchProfile = async () => {
-          const userData =  await axiosInstance.get(`/profile/${params.username}`)
+          const user =  await axiosInstance.get(`/users/profile/${username}`)
 
-          console.log(userData)
+          setUserData(user.data.userData)
         }
 
         fetchProfile()
 
-    }, [])
+    }, [username])
 
 
 
@@ -35,8 +35,8 @@ function Profile() {
                 {/* Profile Image */}
                 <div className="flex-shrink-0">
                     <img
-                        src={user.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || user.username)}&background=random`}
-                        alt={user.username}
+                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(userData?.name || userData?.username)}&background=random`}
+                        alt={userData?.username}
                         className="w-32 h-32 rounded-full border-4 border-indigo-50 shadow-sm object-cover"
                     />
                 </div>
@@ -46,31 +46,31 @@ function Profile() {
                     {/* Header: Name & Username */}
                     <div>
                         <div className="flex items-center justify-center md:justify-start gap-2">
-                            <h2 className="text-2xl font-bold text-gray-900">{user.name}</h2>
-                            {user.isVerified && (
+                            <h2 className="text-2xl font-bold text-gray-900">{userData?.name}</h2>
+                            {userData?.isVerified && (
                                 <span className="text-blue-500 text-sm">✓</span>
                             )}
                         </div>
-                        <p className="text-gray-500 font-medium">@{user.username}</p>
+                        <p className="text-gray-500 font-medium">@{userData?.username}</p>
                     </div>
 
                     {/* Stats: Posts, Followers, Following */}
                     <div className="flex justify-center md:justify-start gap-12 py-2">
                         <div className="text-center md:text-left">
                             <span className="font-bold text-gray-900 mr-1.5">
-                                {user.posts?.length || 0}
+                                {userData?.posts?.length || 0}
                             </span>
                             <span className="text-gray-500 text-sm">Posts</span>
                         </div>
                         <div className="text-center md:text-left">
                             <span className="font-bold text-gray-900 mr-1.5">
-                                {user.followers?.length || 0}
+                                {userData?.followers?.length || 0}
                             </span>
                             <span className="text-gray-500 text-sm">Followers</span>
                         </div>
                         <div className="text-center md:text-left">
                             <span className="font-bold text-gray-900 mr-1.5">
-                                {user.following?.length || 0}
+                                {userData?.following?.length || 0}
                             </span>
                             <span className="text-gray-500 text-sm">Following</span>
                         </div>
@@ -79,7 +79,7 @@ function Profile() {
                     {/* Bio */}
                     <div>
                         <p className="text-gray-700 text-sm leading-relaxed max-w-xl">
-                            {user.bio || "No bio available."}
+                            {userData?.bio || "No bio available."}
                         </p>
                     </div>
                 </div>
