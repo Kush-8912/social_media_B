@@ -5,7 +5,7 @@ import genToken from "../utils/generateToken.js"
 
 
 const cookieOptions = {
-     httpOnly : true
+    httpOnly: true
 }
 
 
@@ -54,7 +54,7 @@ export const registerUser = async (req, res) => {
 
         const token = genToken(newUser._id)
 
-         res.cookie('token' , token , cookieOptions)
+        res.cookie('token', token, cookieOptions)
 
 
 
@@ -100,22 +100,41 @@ export const loginUser = async (req, res) => {
 
         const token = genToken(user._id)
 
-        res.cookie('token' , token , cookieOptions)
+        res.cookie('token', token, cookieOptions)
 
 
-        res.status(200).json({ message: 'User Logged In' , userData : user })
+        res.status(200).json({ message: 'User Logged In', userData: user })
 
     } catch (error) {
         res.status(500).json({ message: 'Server crashed', error: error.message })
     }
 }
 
-export const getMe = (req , res)=>{
+export const getMe = (req, res) => {
 
-    if(!req.user){
-      res.status(404).json({message : 'User Not Found'}) 
+    if (!req.user) {
+        res.status(404).json({ message: 'User Not Found' })
     }
     const authenticatedUser = req.user
-    res.status(200).json({authenticatedUser})
+    res.status(200).json({ authenticatedUser })
+}
+
+export const getUserProfile = async (req, res) => {
+    try {
+        const { username } = req.params
+
+
+        const user = await User.findOne({ username }).select('-password')
+
+        if (!user) {
+            return res.status(404).json({ message: 'User Not Found' })
+        }
+
+        res.status(201).send({ message: "User found", userData: user })
+
+
+    } catch (error) {
+        res.status(500).json({ message: 'Server crashed', error: error.message })
+    }
 }
 
