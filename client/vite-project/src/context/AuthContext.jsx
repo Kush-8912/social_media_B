@@ -1,32 +1,40 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { axiosInstance } from "../axiosCalls/axios";
+import { createContext, useContext, useEffect, useState } from 'react'
+import { axiosInstance } from '../axiosCalls/axios'
 
-const AuthContext = createContext();
+const AuthContext = createContext(null)
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState(null)
+    const [loading, setLoading] = useState(true)
 
     useEffect(() => {
+        let mounted = true
+
         const fetchUser = async () => {
             try {
-                const userData = await axiosInstance.get('/users/me');
-                setUser(userData.data.authenticatedUser);
+                const response = await axiosInstance.get('/users/me')
+                if (!mounted) return
+                setUser(response.data)
             } catch (error) {
-                setUser(null);
+                if (!mounted) return
+                setUser(null)
             } finally {
-                setLoading(false);
+                if (mounted) setLoading(false)
             }
-        };
+        }
 
-        fetchUser();
-    }, []);
+        fetchUser()
+
+        return () => {
+            mounted = false
+        }
+    }, [])
 
     return (
         <AuthContext.Provider value={{ user, setUser, loading }}>
             {children}
         </AuthContext.Provider>
-    );
-};
+    )
+}
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => useContext(AuthContext)
