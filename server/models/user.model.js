@@ -29,6 +29,7 @@ const userSchema = new mongoose.Schema({
     followers: [
         {
             type: mongoose.Schema.Types.ObjectId,
+            // 6aa10de974c1b2368e521bd9
             ref: "User"
         }
     ],

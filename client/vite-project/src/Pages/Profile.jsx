@@ -77,7 +77,7 @@ function Profile() {
             setActionLoading(true)
 
             if (isFollowing) {
-                await axiosInstance.delete(`/users/${userData._id}/follow`)
+                await axiosInstance.delete(`/users/${userData._id}/unfollow`)
             } else {
                 await axiosInstance.post(`/users/${userData._id}/follow`)
             }
