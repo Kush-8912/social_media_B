@@ -1,21 +1,19 @@
 import React from 'react'
 import { useAuth } from '../context/AuthContext'
-import {Navigate} from "react-router-dom"
+import { Navigate } from 'react-router-dom'
 
+function PublicRoute({ children }) {
+  const { user, loading } = useAuth()
 
-function PublicRoute({children}) {
-   // we check for user Data - authenticated user Data is here
-   const {user} = useAuth()
+  if (loading) {
+    return <div>Loading...</div>
+  }
 
-   //    navigate to home
-   if(user){
-   return <Navigate to='/home'/>
-   }
-
-  // if not we stay on children - login signup or lanidng
+  if (user) {
+    return <Navigate to="/home" replace />
+  }
 
   return children
-
 }
 
 export default PublicRoute
