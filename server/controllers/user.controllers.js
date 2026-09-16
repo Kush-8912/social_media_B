@@ -7,6 +7,10 @@ const cookieOptions = {
     httpOnly: true
 }
 
+const populateUserConnections = (query) => query
+    .populate('followers', 'name username profileImage isVerified')
+    .populate('following', 'name username profileImage isVerified')
+
 export const registerUser = async (req, res) => {
     try {
         const { name, username, email, password } = req.body
@@ -66,10 +70,9 @@ export const loginUser = async (req, res) => {
 export const getMe = async (req, res) => {
     if (!req.user) return res.status(404).json({ message: 'User Not Found' })
 
-    const authenticatedUser = await User.findById(req.user._id)
-        .select('-password')
-        .populate('followers', 'name username profileImage isVerified')
-        .populate('following', 'name username profileImage isVerified')
+    const authenticatedUser = await populateUserConnections(
+        User.findById(req.user._id).select('-password')
+    )
 
     res.status(200).json({ authenticatedUser })
 }
@@ -77,10 +80,9 @@ export const getMe = async (req, res) => {
 export const getUserProfile = async (req, res) => {
     try {
         const { username } = req.params
-        const user = await User.findOne({ username })
-            .select('-password')
-            .populate('followers', 'name username profileImage isVerified')
-            .populate('following', 'name username profileImage isVerified')
+        const user = await populateUserConnections(
+            User.findOne({ username }).select('-password')
+        )
 
         if (!user) return res.status(404).json({ message: 'User Not Found' })
 
@@ -122,10 +124,9 @@ export const followUser = async (req, res) => {
             User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUserId } })
         ])
 
-        const updatedTargetUser = await User.findById(targetUserId)
-            .select('-password')
-            .populate('followers', 'name username profileImage isVerified')
-            .populate('following', 'name username profileImage isVerified')
+        const updatedTargetUser = await populateUserConnections(
+            User.findById(targetUserId).select('-password')
+        )
 
         res.status(200).json({
             message: 'User followed',
@@ -160,10 +161,9 @@ export const unFollowUser = async (req, res) => {
             User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUserId } })
         ])
 
-        const updatedTargetUser = await User.findById(targetUserId)
-            .select('-password')
-            .populate('followers', 'name username profileImage isVerified')
-            .populate('following', 'name username profileImage isVerified')
+        const updatedTargetUser = await populateUserConnections(
+            User.findById(targetUserId).select('-password')
+        )
 
         res.status(200).json({
             message: 'User unfollowed',
