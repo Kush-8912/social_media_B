@@ -4,18 +4,12 @@ import { isAuthenticated } from '../middlewares/authMiddleware.js'
 
 const userRoutes = express.Router()
 
-
 userRoutes.post('/register', registerUser)
 userRoutes.post('/login', loginUser)
-userRoutes.get('/me' , isAuthenticated ,getMe )
-userRoutes.get('/profile/:username' ,isAuthenticated ,getUserProfile )
+userRoutes.get('/me', isAuthenticated, getMe)
+userRoutes.get('/profile/:username', isAuthenticated, getUserProfile)
 
-userRoutes.post('/:id/follow' , isAuthenticated , followUser)
-userRoutes.post('/:id/unfollow' , isAuthenticated , unFollowUser)
-
-// Implement log out route
-
-
-
+userRoutes.post('/:id/follow', isAuthenticated, followUser)
+userRoutes.post('/:id/unfollow', isAuthenticated, unFollowUser)
 
 export default userRoutes
