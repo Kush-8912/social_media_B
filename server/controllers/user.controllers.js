@@ -3,20 +3,16 @@ import User from "../models/user.model.js"
 import bcrypt from 'bcrypt'
 import genToken from "../utils/generateToken.js"
 
-
 const cookieOptions = {
     httpOnly: true
 }
 
-
 export const registerUser = async (req, res) => {
     try {
-
         const { name, username, email, password } = req.body
 
-
         if (!name || !username || !email || !password) {
-            return res.status(400).json({ message: 'All fileds Required' })
+            return res.status(400).json({ message: 'All fields are required' })
         }
 
         if (password.length <= 6) {
@@ -24,115 +20,82 @@ export const registerUser = async (req, res) => {
         }
 
         const userExists = await User.findOne({ username })
-
-        if (userExists) {
-            return res.status(409).json({ message: 'User Already Exists' })
-        }
-
+        if (userExists) return res.status(409).json({ message: 'User Already Exists' })
 
         const emailExists = await User.findOne({ email })
-
-        if (emailExists) {
-            return res.status(409).json({ message: 'User Already Exists' })
-        }
+        if (emailExists) return res.status(409).json({ message: 'User Already Exists' })
 
         const salt = await bcrypt.genSalt(10)
-
-        console.log(salt)
-
         const hashedPassword = await bcrypt.hash(password, salt)
-        // We have to talk about rounds
 
-
-        const newUser = await User.create({
-            name,
-            username,
-            email,
-            password: hashedPassword
-
-        })
-
+        const newUser = await User.create({ name, username, email, password: hashedPassword })
         const token = genToken(newUser._id)
-
         res.cookie('token', token, cookieOptions)
 
+        const safeUser = newUser.toObject()
+        delete safeUser.password
 
-
-
-        res.status(201).json({ message: 'User Registered', user: newUser })
-
+        res.status(201).json({ message: 'User Registered', user: safeUser })
     } catch (error) {
         res.status(500).json({ message: 'Server crashed', error: error.message })
     }
-
-
-
-
-
-
 }
-
-
 
 export const loginUser = async (req, res) => {
     try {
         const { email, password } = req.body
-        // abc1234
-
-        if (!email || !password) {
-            return res.status(400).json({ message: 'All fileds Required' })
-        }
+        if (!email || !password) return res.status(400).json({ message: 'All fields are required' })
 
         const user = await User.findOne({ email })
-
-        if (!user) {
-            return res.status(404).json({ message: 'User Not Found' })
-        }
+        if (!user) return res.status(404).json({ message: 'User Not Found' })
 
         const passwordMatched = await bcrypt.compare(password, user.password)
-
-
-        if (!passwordMatched) {
-            return res.status(401).json({ message: 'Password Did not match' })
-        }
-
-        console.log(passwordMatched)
+        if (!passwordMatched) return res.status(401).json({ message: 'Password Did not match' })
 
         const token = genToken(user._id)
-
         res.cookie('token', token, cookieOptions)
 
-
-        res.status(200).json({ message: 'User Logged In', userData: user })
-
+        const safeUser = user.toObject()
+        delete safeUser.password
+        res.status(200).json({ message: 'User Logged In', userData: safeUser })
     } catch (error) {
         res.status(500).json({ message: 'Server crashed', error: error.message })
     }
 }
 
-export const getMe = (req, res) => {
+export const getMe = async (req, res) => {
+    if (!req.user) return res.status(404).json({ message: 'User Not Found' })
 
-    if (!req.user) {
-        res.status(404).json({ message: 'User Not Found' })
-    }
-    const authenticatedUser = req.user
+    const authenticatedUser = await User.findById(req.user._id)
+        .select('-password')
+        .populate('followers', 'name username profileImage isVerified')
+        .populate('following', 'name username profileImage isVerified')
+
     res.status(200).json({ authenticatedUser })
 }
 
 export const getUserProfile = async (req, res) => {
     try {
         const { username } = req.params
+        const user = await User.findOne({ username })
+            .select('-password')
+            .populate('followers', 'name username profileImage isVerified')
+            .populate('following', 'name username profileImage isVerified')
 
+        if (!user) return res.status(404).json({ message: 'User Not Found' })
 
-        const user = await User.findOne({ username }).select('-password')
+        const currentUserId = req.user?._id?.toString()
+        const isFollowing = currentUserId
+            ? user.followers.some((follower) => follower._id.toString() === currentUserId)
+            : false
 
-        if (!user) {
-            return res.status(404).json({ message: 'User Not Found' })
-        }
-
-        res.status(201).send({ message: "User found", userData: user })
-
-
+        res.status(200).json({
+            message: 'User found',
+            userData: user,
+            isFollowing,
+            followersCount: user.followers.length,
+            followingCount: user.following.length
+        })
     } catch (error) {
         res.status(500).json({ message: 'Server crashed', error: error.message })
     }
@@ -140,57 +103,76 @@ export const getUserProfile = async (req, res) => {
 
 export const followUser = async (req, res) => {
     try {
-        const currentUserId = req.user._id // alex
-        const targetUserId = req.params.id // steve
+        const currentUserId = req.user._id
+        const targetUserId = req.params.id
 
+        if (!targetUserId.match(/^[0-9a-fA-F]{24}$/)) {
+            return res.status(400).json({ message: 'Invalid user id' })
+        }
 
         if (currentUserId.toString() === targetUserId.toString()) {
-            return res.status(409).json({ message: 'you cannot follow YourSelf' })
+            return res.status(409).json({ message: 'You cannot follow yourself' })
         }
-        // addToSet
 
-        // if current user is already follwing targetUser
-        //
+        const targetUser = await User.findById(targetUserId)
+        if (!targetUser) return res.status(404).json({ message: 'Target user not found' })
 
-        await User.findByIdAndUpdate(currentUserId, { $addToSet: { following: targetUserId } })
+        await Promise.all([
+            User.findByIdAndUpdate(currentUserId, { $addToSet: { following: targetUserId } }),
+            User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUserId } })
+        ])
 
-        await User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUserId } })
+        const updatedTargetUser = await User.findById(targetUserId)
+            .select('-password')
+            .populate('followers', 'name username profileImage isVerified')
+            .populate('following', 'name username profileImage isVerified')
 
-
-      res.status(200).send({message : "user Followed"})
-
-
+        res.status(200).json({
+            message: 'User followed',
+            userData: updatedTargetUser,
+            isFollowing: true,
+            followersCount: updatedTargetUser.followers.length,
+            followingCount: updatedTargetUser.following.length
+        })
     } catch (error) {
         res.status(500).json({ message: 'Server crashed', error: error.message })
     }
 }
-
 
 export const unFollowUser = async (req, res) => {
     try {
-        const currentUserId = req.user._id // alex
-        const targetUserId = req.params.id // steve
+        const currentUserId = req.user._id
+        const targetUserId = req.params.id
 
+        if (!targetUserId.match(/^[0-9a-fA-F]{24}$/)) {
+            return res.status(400).json({ message: 'Invalid user id' })
+        }
 
         if (currentUserId.toString() === targetUserId.toString()) {
-            return res.status(409).json({ message: 'you cannot unfollow YourSelf' })
+            return res.status(409).json({ message: 'You cannot unfollow yourself' })
         }
-        // addToSet
 
-        // if current user is already follwing targetUser
-        //
+        const targetUser = await User.findById(targetUserId)
+        if (!targetUser) return res.status(404).json({ message: 'Target user not found' })
 
-        await User.findByIdAndUpdate(currentUserId, { $pull: { following: targetUserId } })
+        await Promise.all([
+            User.findByIdAndUpdate(currentUserId, { $pull: { following: targetUserId } }),
+            User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUserId } })
+        ])
 
-        await User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUserId } })
+        const updatedTargetUser = await User.findById(targetUserId)
+            .select('-password')
+            .populate('followers', 'name username profileImage isVerified')
+            .populate('following', 'name username profileImage isVerified')
 
-
-        res.status(200).send({message : "user Unfollowed"})
-
-
+        res.status(200).json({
+            message: 'User unfollowed',
+            userData: updatedTargetUser,
+            isFollowing: false,
+            followersCount: updatedTargetUser.followers.length,
+            followingCount: updatedTargetUser.following.length
+        })
     } catch (error) {
         res.status(500).json({ message: 'Server crashed', error: error.message })
     }
 }
-
-
