@@ -111,11 +111,13 @@ function Profile() {
     }
 
     const handleImageChange = (event) => {
-        const file = event.target.files?.[0]
+        const file = event.target.files[0]
+        console.log(file)
         if (!file) return
 
         setSelectedImage(file)
         const previewUrl = URL.createObjectURL(file)
+        console.log(previewUrl)
         setPreviewImage(previewUrl)
     }
 
