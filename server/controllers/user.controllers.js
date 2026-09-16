@@ -7,10 +7,6 @@ const cookieOptions = {
     httpOnly: true
 }
 
-const populateUserConnections = (query) => query
-    .populate('followers', 'name username profileImage isVerified')
-    .populate('followings', 'name username profileImage isVerified')
-
 export const registerUser = async (req, res) => {
     try {
         const { name, username, email, password } = req.body
@@ -68,38 +64,30 @@ export const loginUser = async (req, res) => {
 }
 
 export const getMe = async (req, res) => {
-    if (!req.user) return res.status(404).json({ message: 'User Not Found' })
-
-    const authenticatedUser = await populateUserConnections(
-        User.findById(req.user._id).select('-password')
-    )
-
-    res.status(200).json({ authenticatedUser })
+    return res.status(200).json(req.user)
 }
 
 export const getUserProfile = async (req, res) => {
     try {
         const { username } = req.params
-        const user = await populateUserConnections(
-            User.findOne({ username }).select('-password')
-        )
 
-        if (!user) return res.status(404).json({ message: 'User Not Found' })
+        const userData = await User.findOne({ username })
+            .select('-password')
+            // tom - 456
+            .populate('followers', 'name username profileImage')
+            .populate('followings', 'name username profileImage')
 
-        const currentUserId = req.user?._id?.toString()
-        const isFollowing = currentUserId
-            ? user.followers.some((follower) => follower._id.toString() === currentUserId)
-            : false
+        if (!userData) {
+            return res.status(404).json({ message: 'User Not Found' })
+        }
 
-        res.status(200).json({
+        return res.status(200).json({
             message: 'User found',
-            userData: user,
-            isFollowing,
-            followersCount: user.followers.length,
-            followingCount: user.followings.length
+            userData
         })
     } catch (error) {
-        res.status(500).json({ message: 'Server crashed', error: error.message })
+        console.log(error)
+        return res.status(500).json({ message: 'Internal Server Error' })
     }
 }
 
@@ -108,71 +96,65 @@ export const followUser = async (req, res) => {
         const currentUserId = req.user._id
         const targetUserId = req.params.id
 
-        if (!targetUserId.match(/^[0-9a-fA-F]{24}$/)) {
-            return res.status(400).json({ message: 'Invalid user id' })
-        }
-
         if (currentUserId.toString() === targetUserId.toString()) {
             return res.status(409).json({ message: 'You cannot follow yourself' })
         }
 
         const targetUser = await User.findById(targetUserId)
-        if (!targetUser) return res.status(404).json({ message: 'Target user not found' })
 
-        await Promise.all([
-            User.findByIdAndUpdate(currentUserId, { $addToSet: { followings: targetUserId } }),
-            User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUserId } })
-        ])
+        if (!targetUser) {
+            return res.status(404).json({ message: 'No Target User Found' })
+        }
 
-        const updatedTargetUser = await populateUserConnections(
-            User.findById(targetUserId).select('-password')
+        const alreadyFollowing = targetUser.followers.some(
+            (id) => id.toString() === currentUserId.toString()
         )
 
-        res.status(200).json({
-            message: 'User followed',
-            userData: updatedTargetUser,
-            isFollowing: true,
-            followersCount: updatedTargetUser.followers.length,
-            followingCount: updatedTargetUser.followings.length
+        if (alreadyFollowing) {
+            return res.status(409).json({ message: 'You are already following this user' })
+        }
+
+        await User.findByIdAndUpdate(currentUserId, {
+            $addToSet: { followings: targetUserId }
         })
+
+        await User.findByIdAndUpdate(targetUserId, {
+            $addToSet: { followers: currentUserId }
+        })
+
+        return res.status(200).json({ message: 'User followed' })
     } catch (error) {
-        res.status(500).json({ message: 'Server crashed', error: error.message })
+        console.log(error)
+        return res.status(500).json({ message: 'Internal Server Error' })
     }
 }
 
-export const unFollowUser = async (req, res) => {
+export const unfollowUser = async (req, res) => {
     try {
         const currentUserId = req.user._id
         const targetUserId = req.params.id
-
-        if (!targetUserId.match(/^[0-9a-fA-F]{24}$/)) {
-            return res.status(400).json({ message: 'Invalid user id' })
-        }
 
         if (currentUserId.toString() === targetUserId.toString()) {
             return res.status(409).json({ message: 'You cannot unfollow yourself' })
         }
 
         const targetUser = await User.findById(targetUserId)
-        if (!targetUser) return res.status(404).json({ message: 'Target user not found' })
 
-        await Promise.all([
-            User.findByIdAndUpdate(currentUserId, { $pull: { followings: targetUserId } }),
-            User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUserId } })
-        ])
+        if (!targetUser) {
+            return res.status(404).json({ message: 'No Target User Found' })
+        }
 
-        const updatedTargetUser = await populateUserConnections(
-            User.findById(targetUserId).select('-password')
-        )
-
-        res.status(200).json({
-            message: 'User unfollowed',
-            userData: updatedTargetUser,
-            isFollowing: false,
-            followersCount: updatedTargetUser.followers.length,
-            followingCount: updatedTargetUser.followings.length
+        await User.findByIdAndUpdate(currentUserId, {
+            $pull: { followings: targetUserId }
         })
+
+        await User.findByIdAndUpdate(targetUserId, {
+            $pull: { followers: currentUserId }
+        })
+
+        return res.status(200).json({ message: 'User unfollowed' })
     } catch (error) {
-        res.status(500).json({ message: 'Server crashed', error: error.message })
+        console.log(error)
+        return res.status(500).json({ message: 'Internal Server Error' })
     }
 }

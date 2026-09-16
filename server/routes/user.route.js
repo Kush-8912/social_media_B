@@ -9,6 +9,7 @@ userRoutes.post('/login', loginUser)
 userRoutes.get('/me', isAuthenticated, getMe)
 userRoutes.get('/profile/:username', isAuthenticated, getUserProfile)
 
+// Following and followers
 userRoutes.post('/:id/follow', isAuthenticated, followUser)
 userRoutes.delete('/:id/follow', isAuthenticated, unFollowUser)
 
