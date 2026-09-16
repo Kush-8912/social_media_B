@@ -7,6 +7,12 @@ const cookieOptions = {
     httpOnly: true
 }
 
+const sanitizeUser = (user) => {
+    const safeUser = user.toObject ? user.toObject() : { ...user }
+    delete safeUser.password
+    return safeUser
+}
+
 export const registerUser = async (req, res) => {
     try {
         const { name, username, email, password } = req.body
@@ -32,12 +38,12 @@ export const registerUser = async (req, res) => {
         const token = genToken(newUser._id)
         res.cookie('token', token, cookieOptions)
 
-        const safeUser = newUser.toObject()
-        delete safeUser.password
-
-        res.status(201).json({ message: 'User Registered', user: safeUser })
+        return res.status(201).json({
+            message: 'User Registered',
+            user: sanitizeUser(newUser)
+        })
     } catch (error) {
-        res.status(500).json({ message: 'Server crashed', error: error.message })
+        return res.status(500).json({ message: 'Server crashed', error: error.message })
     }
 }
 
@@ -55,16 +61,17 @@ export const loginUser = async (req, res) => {
         const token = genToken(user._id)
         res.cookie('token', token, cookieOptions)
 
-        const safeUser = user.toObject()
-        delete safeUser.password
-        res.status(200).json({ message: 'User Logged In', userData: safeUser })
+        return res.status(200).json({
+            message: 'User Logged In',
+            userData: sanitizeUser(user)
+        })
     } catch (error) {
-        res.status(500).json({ message: 'Server crashed', error: error.message })
+        return res.status(500).json({ message: 'Server crashed', error: error.message })
     }
 }
 
 export const getMe = async (req, res) => {
-    return res.status(200).json(req.user)
+    return res.status(200).json(sanitizeUser(req.user))
 }
 
 export const getUserProfile = async (req, res) => {
@@ -73,7 +80,6 @@ export const getUserProfile = async (req, res) => {
 
         const userData = await User.findOne({ username })
             .select('-password')
-            // tom - 456
             .populate('followers', 'name username profileImage')
             .populate('followings', 'name username profileImage')
 
