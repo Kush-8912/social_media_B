@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import axiosInstance from '../axiosCalls/axios'
+import { axiosInstance } from '../axiosCalls/axios'
 import { useAuth } from '../context/AuthContext'
 
 function Profile() {
@@ -14,45 +14,65 @@ function Profile() {
     const [editForm, setEditForm] = useState({ name: '', username: '', email: '', bio: '' })
     const [selectedImage, setSelectedImage] = useState(null)
     const [previewImage, setPreviewImage] = useState('')
+    const [error, setError] = useState('')
 
     const isOwnProfile = loggedInUser?.username === username
 
     const fetchProfile = async () => {
-        try {
-            const user = await axiosInstance.get(`/users/profile/${username}`)
-            setUserData(user.data.userData)
-            return user.data.userData
-        } catch (error) {
-            console.error("Failed to fetch profile data:", error)
-            return null
-        }
+        const response = await axiosInstance.get(`/users/profile/${username}`)
+        return response.data.userData
     }
 
     useEffect(() => {
+        let mounted = true
+
         const loadProfile = async () => {
             try {
                 setLoading(true)
+                setError('')
 
                 const profile = await fetchProfile()
-                if (!profile || isOwnProfile) return
+                if (!mounted) return
+
+                setUserData(profile)
+
+                if (isOwnProfile) {
+                    setIsFollowing(false)
+                    return
+                }
 
                 const meResponse = await axiosInstance.get('/users/me')
                 const myFollowingList = meResponse.data.followings || []
+                const followingIds = myFollowingList.map((item) =>
+                    typeof item === 'object' ? item._id : item
+                )
 
                 setIsFollowing(
-                    myFollowingList.some(
-                        (id) => id.toString() === profile._id.toString()
-                    )
+                    followingIds.some((id) => id?.toString() === profile._id?.toString())
                 )
+            } catch (requestError) {
+                console.error('Failed to fetch profile data:', requestError)
+                if (mounted) {
+                    setUserData(null)
+                    setError(requestError.response?.data?.message || 'Failed to load profile.')
+                }
             } finally {
-                setLoading(false)
+                if (mounted) setLoading(false)
             }
         }
 
-        loadProfile()
+        if (username) {
+            loadProfile()
+        }
+
+        return () => {
+            mounted = false
+        }
     }, [username, isOwnProfile])
 
     const handleFollowToggle = async () => {
+        if (!userData?._id || actionLoading) return
+
         try {
             setActionLoading(true)
 
@@ -62,11 +82,12 @@ function Profile() {
                 await axiosInstance.post(`/users/${userData._id}/follow`)
             }
 
+            const profile = await fetchProfile()
+            setUserData(profile)
             setIsFollowing((prev) => !prev)
-            await fetchProfile()
-        } catch (error) {
-            console.error("Follow action failed:", error)
-            alert(error.response?.data?.message || "Something went wrong")
+        } catch (requestError) {
+            console.error('Follow action failed:', requestError)
+            alert(requestError.response?.data?.message || 'Something went wrong')
         } finally {
             setActionLoading(false)
         }
@@ -94,7 +115,6 @@ function Profile() {
         if (!file) return
 
         setSelectedImage(file)
-
         const previewUrl = URL.createObjectURL(file)
         setPreviewImage(previewUrl)
     }
@@ -120,7 +140,7 @@ function Profile() {
     if (!userData) {
         return (
             <div className="text-center py-10 text-gray-500">
-                User profile not found.
+                {error || 'User profile not found.'}
             </div>
         )
     }
@@ -161,7 +181,7 @@ function Profile() {
             <div className="py-4">
                 <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">About</h2>
                 <p className="text-gray-700 text-sm leading-relaxed">
-                    {userData.bio || "No bio available yet."}
+                    {userData.bio || 'No bio available yet.'}
                 </p>
             </div>
 
@@ -267,60 +287,29 @@ function Profile() {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                                <input
-                                    type="text"
-                                    name="name"
-                                    value={editForm.name}
-                                    onChange={handleEditChange}
-                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                                />
+                                <input type="text" name="name" value={editForm.name} onChange={handleEditChange} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                                <input
-                                    type="text"
-                                    name="username"
-                                    value={editForm.username}
-                                    onChange={handleEditChange}
-                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                                />
+                                <input type="text" name="username" value={editForm.username} onChange={handleEditChange} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={editForm.email}
-                                    onChange={handleEditChange}
-                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                                />
+                                <input type="email" name="email" value={editForm.email} onChange={handleEditChange} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-                                <textarea
-                                    name="bio"
-                                    value={editForm.bio}
-                                    onChange={handleEditChange}
-                                    rows="4"
-                                    className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                                />
+                                <textarea name="bio" value={editForm.bio} onChange={handleEditChange} rows="4" className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm" />
                             </div>
 
                             <div className="flex justify-end gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEditOpen(false)}
-                                    className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                                >
+                                <button type="button" onClick={() => setIsEditOpen(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">
                                     Cancel
                                 </button>
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
-                                >
+                                <button type="submit" className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
                                     Save Changes
                                 </button>
                             </div>
