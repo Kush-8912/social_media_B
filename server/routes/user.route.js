@@ -10,6 +10,6 @@ userRoutes.get('/me', isAuthenticated, getMe)
 userRoutes.get('/profile/:username', isAuthenticated, getUserProfile)
 
 userRoutes.post('/:id/follow', isAuthenticated, followUser)
-userRoutes.post('/:id/unfollow', isAuthenticated, unFollowUser)
+userRoutes.delete('/:id/follow', isAuthenticated, unFollowUser)
 
 export default userRoutes
