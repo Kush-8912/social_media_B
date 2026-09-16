@@ -9,7 +9,7 @@ const cookieOptions = {
 
 const populateUserConnections = (query) => query
     .populate('followers', 'name username profileImage isVerified')
-    .populate('following', 'name username profileImage isVerified')
+    .populate('followings', 'name username profileImage isVerified')
 
 export const registerUser = async (req, res) => {
     try {
@@ -96,7 +96,7 @@ export const getUserProfile = async (req, res) => {
             userData: user,
             isFollowing,
             followersCount: user.followers.length,
-            followingCount: user.following.length
+            followingCount: user.followings.length
         })
     } catch (error) {
         res.status(500).json({ message: 'Server crashed', error: error.message })
@@ -120,7 +120,7 @@ export const followUser = async (req, res) => {
         if (!targetUser) return res.status(404).json({ message: 'Target user not found' })
 
         await Promise.all([
-            User.findByIdAndUpdate(currentUserId, { $addToSet: { following: targetUserId } }),
+            User.findByIdAndUpdate(currentUserId, { $addToSet: { followings: targetUserId } }),
             User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUserId } })
         ])
 
@@ -133,7 +133,7 @@ export const followUser = async (req, res) => {
             userData: updatedTargetUser,
             isFollowing: true,
             followersCount: updatedTargetUser.followers.length,
-            followingCount: updatedTargetUser.following.length
+            followingCount: updatedTargetUser.followings.length
         })
     } catch (error) {
         res.status(500).json({ message: 'Server crashed', error: error.message })
@@ -157,7 +157,7 @@ export const unFollowUser = async (req, res) => {
         if (!targetUser) return res.status(404).json({ message: 'Target user not found' })
 
         await Promise.all([
-            User.findByIdAndUpdate(currentUserId, { $pull: { following: targetUserId } }),
+            User.findByIdAndUpdate(currentUserId, { $pull: { followings: targetUserId } }),
             User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUserId } })
         ])
 
@@ -170,7 +170,7 @@ export const unFollowUser = async (req, res) => {
             userData: updatedTargetUser,
             isFollowing: false,
             followersCount: updatedTargetUser.followers.length,
-            followingCount: updatedTargetUser.following.length
+            followingCount: updatedTargetUser.followings.length
         })
     } catch (error) {
         res.status(500).json({ message: 'Server crashed', error: error.message })

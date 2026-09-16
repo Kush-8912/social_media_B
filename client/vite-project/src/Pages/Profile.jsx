@@ -1,183 +1,331 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import axiosInstance from '../axiosCalls/axios'
 import { useAuth } from '../context/AuthContext'
-import { axiosInstance } from '../axiosCalls/axios'
-
-const PersonList = ({ title, people }) => {
-    if (!people?.length) {
-        return (
-            <div className="rounded-xl border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500">
-                No {title.toLowerCase()} yet.
-            </div>
-        )
-    }
-
-    return (
-        <div className="space-y-3">
-            {people.map((person) => (
-                <Link
-                    key={person._id}
-                    to={`/profile/${person.username}`}
-                    className="flex items-center gap-3 rounded-xl p-2 hover:bg-gray-50 transition-colors"
-                >
-                    <img
-                        src={
-                            person.profileImage ||
-                            `https://ui-avatars.com/api/?name=${encodeURIComponent(person.name || person.username)}&background=random`
-                        }
-                        alt={person.username}
-                        className="w-10 h-10 rounded-full object-cover"
-                    />
-                    <div className="min-w-0">
-                        <p className="font-semibold text-gray-900 truncate">{person.name}</p>
-                        <p className="text-sm text-gray-500 truncate">@{person.username}</p>
-                    </div>
-                </Link>
-            ))}
-        </div>
-    )
-}
 
 function Profile() {
-    const { user } = useAuth()
     const { username } = useParams()
-
+    const { user: loggedInUser } = useAuth()
     const [userData, setUserData] = useState(null)
+    const [loading, setLoading] = useState(true)
     const [isFollowing, setIsFollowing] = useState(false)
     const [actionLoading, setActionLoading] = useState(false)
-    const [activeList, setActiveList] = useState(null)
+    const [isEditOpen, setIsEditOpen] = useState(false)
+    const [editForm, setEditForm] = useState({ name: '', username: '', email: '', bio: '' })
+    const [selectedImage, setSelectedImage] = useState(null)
+    const [previewImage, setPreviewImage] = useState('')
+
+    const isOwnProfile = loggedInUser?.username === username
+
+    const fetchProfile = async () => {
+        try {
+            const user = await axiosInstance.get(`/users/profile/${username}`)
+            setUserData(user.data.userData)
+            return user.data.userData
+        } catch (error) {
+            console.error("Failed to fetch profile data:", error)
+            return null
+        }
+    }
 
     useEffect(() => {
-        const fetchProfile = async () => {
+        const loadProfile = async () => {
             try {
-                const response = await axiosInstance.get(`/users/profile/${username}`)
-                setUserData(response.data.userData)
-                setIsFollowing(response.data.isFollowing)
-            } catch (error) {
-                console.error('Error fetching profile:', error)
+                setLoading(true)
+
+                const profile = await fetchProfile()
+                if (!profile || isOwnProfile) return
+
+                const meResponse = await axiosInstance.get('/users/me')
+                const myFollowingList = meResponse.data.followings || []
+
+                setIsFollowing(
+                    myFollowingList.some(
+                        (id) => id.toString() === profile._id.toString()
+                    )
+                )
+            } finally {
+                setLoading(false)
             }
         }
 
-        fetchProfile()
-    }, [username])
+        loadProfile()
+    }, [username, isOwnProfile])
 
     const handleFollowToggle = async () => {
-        if (!userData || actionLoading) return
-
-        setActionLoading(true)
-
         try {
-            const endpoint = isFollowing
-                ? `/users/${userData._id}/unfollow`
-                : `/users/${userData._id}/follow`
+            setActionLoading(true)
 
-            const response = await axiosInstance.post(endpoint)
+            if (isFollowing) {
+                await axiosInstance.delete(`/users/${userData._id}/follow`)
+            } else {
+                await axiosInstance.post(`/users/${userData._id}/follow`)
+            }
 
-            setUserData(response.data.userData)
-            setIsFollowing(response.data.isFollowing)
+            setIsFollowing((prev) => !prev)
+            await fetchProfile()
         } catch (error) {
-            console.error('Follow action failed:', error)
-            alert(error.response?.data?.message || 'Something went wrong')
+            console.error("Follow action failed:", error)
+            alert(error.response?.data?.message || "Something went wrong")
         } finally {
             setActionLoading(false)
         }
     }
 
-    if (!user || !userData) return null
+    const openEditProfile = () => {
+        setEditForm({
+            name: userData?.name || '',
+            username: userData?.username || '',
+            email: userData?.email || '',
+            bio: userData?.bio || ''
+        })
+        setSelectedImage(null)
+        setPreviewImage('')
+        setIsEditOpen(true)
+    }
 
-    const isOwner = user._id === userData._id || user.username === userData.username
+    const handleEditChange = (event) => {
+        const { name, value } = event.target
+        setEditForm((prev) => ({ ...prev, [name]: value }))
+    }
+
+    const handleImageChange = (event) => {
+        const file = event.target.files?.[0]
+        if (!file) return
+
+        setSelectedImage(file)
+
+        const previewUrl = URL.createObjectURL(file)
+        setPreviewImage(previewUrl)
+    }
+
+    const handleEditSubmit = (event) => {
+        event.preventDefault()
+        setUserData((prev) => ({
+            ...prev,
+            ...editForm,
+            profileImage: previewImage || prev.profileImage
+        }))
+        setIsEditOpen(false)
+    }
+
+    if (loading) {
+        return (
+            <div className="flex justify-center items-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+            </div>
+        )
+    }
+
+    if (!userData) {
+        return (
+            <div className="text-center py-10 text-gray-500">
+                User profile not found.
+            </div>
+        )
+    }
 
     return (
-        <div className="max-w-5xl mx-auto my-8 px-4">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-                <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
-                    <div className="flex-shrink-0">
-                        <img
-                            src={
-                                userData.profileImage ||
-                                `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || userData.username)}&background=random`
-                            }
-                            alt={userData.username}
-                            className="w-32 h-32 rounded-full border-4 border-indigo-50 shadow-sm object-cover"
-                        />
-                    </div>
+        <div className="max-w-2xl mx-auto my-8 p-6 bg-white rounded-xl shadow-md border border-gray-100">
+            <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-gray-100">
+                <img
+                    src={userData.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || 'User')}&background=6366f1&color=fff`}
+                    alt={userData.name || 'Profile'}
+                    className="w-28 h-28 rounded-full object-cover border-4 border-indigo-50 shadow-sm"
+                />
 
-                    <div className="flex-1 text-center md:text-left space-y-4 w-full">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div>
-                                <div className="flex items-center justify-center md:justify-start gap-2">
-                                    <h2 className="text-2xl font-bold text-gray-900">{userData.name}</h2>
-                                    {userData.isVerified && <span className="text-blue-500 text-sm">✓</span>}
-                                </div>
-                                <p className="text-gray-500 font-medium">@{userData.username}</p>
-                            </div>
+                <div className="text-center sm:text-left space-y-1">
+                    <h1 className="text-2xl font-bold text-gray-900">{userData.name}</h1>
+                    <p className="text-sm font-medium text-indigo-600">@{userData.username}</p>
+                    <p className="text-sm text-gray-500">{userData.email}</p>
 
-                            {isOwner ? (
-                                <button className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold rounded-lg transition-colors border border-gray-200">
-                                    Edit Profile
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={handleFollowToggle}
-                                    disabled={actionLoading}
-                                    className={`px-6 py-2 text-sm font-semibold rounded-lg transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed ${
-                                        isFollowing
-                                            ? 'bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-200'
-                                            : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                                    }`}
-                                >
-                                    {actionLoading ? 'Please wait...' : isFollowing ? 'Following' : 'Follow'}
-                                </button>
-                            )}
-                        </div>
-
-                        <div className="flex justify-center md:justify-start gap-10 py-2">
-                            <div className="text-center md:text-left">
-                                <span className="font-bold text-gray-900 mr-1.5">{userData.posts?.length || 0}</span>
-                                <span className="text-gray-500 text-sm">Posts</span>
-                            </div>
-
-                            <button
-                                onClick={() => setActiveList(activeList === 'followers' ? null : 'followers')}
-                                className="text-center md:text-left hover:opacity-70 transition-opacity"
-                            >
-                                <span className="font-bold text-gray-900 mr-1.5">{userData.followers?.length || 0}</span>
-                                <span className="text-gray-500 text-sm">Followers</span>
-                            </button>
-
-                            <button
-                                onClick={() => setActiveList(activeList === 'following' ? null : 'following')}
-                                className="text-center md:text-left hover:opacity-70 transition-opacity"
-                            >
-                                <span className="font-bold text-gray-900 mr-1.5">{userData.following?.length || 0}</span>
-                                <span className="text-gray-500 text-sm">Following</span>
-                            </button>
-                        </div>
-
-                        <p className="text-gray-700 text-sm leading-relaxed max-w-xl">
-                            {userData.bio || 'No bio available.'}
-                        </p>
-                    </div>
+                    {isOwnProfile ? (
+                        <button
+                            onClick={openEditProfile}
+                            className="mt-3 px-5 py-2 rounded-lg border border-indigo-600 text-indigo-600 text-sm font-medium hover:bg-indigo-50"
+                        >
+                            Edit Profile
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleFollowToggle}
+                            disabled={actionLoading}
+                            className="mt-3 px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium disabled:opacity-50"
+                        >
+                            {actionLoading ? 'Please wait...' : isFollowing ? 'Unfollow' : 'Follow'}
+                        </button>
+                    )}
                 </div>
             </div>
 
-            {activeList && (
-                <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold text-gray-900">
-                            {activeList === 'followers' ? 'Followers' : 'Following'}
-                        </h3>
-                        <button
-                            onClick={() => setActiveList(null)}
-                            className="text-sm text-gray-500 hover:text-gray-900"
-                        >
-                            Close
-                        </button>
+            <div className="py-4">
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">About</h2>
+                <p className="text-gray-700 text-sm leading-relaxed">
+                    {userData.bio || "No bio available yet."}
+                </p>
+            </div>
+
+            <div className="flex justify-around items-center pt-4 border-t border-gray-100 text-center">
+                <div className="flex-1">
+                    <span className="block text-xl font-bold text-gray-900">
+                        {userData.posts?.length ?? userData.postsCount ?? 0}
+                    </span>
+                    <span className="text-xs text-gray-500 font-medium">Posts</span>
+                </div>
+                <div className="h-8 w-px bg-gray-200"></div>
+                <div className="flex-1">
+                    <span className="block text-xl font-bold text-gray-900">
+                        {userData.followers?.length || 0}
+                    </span>
+                    <span className="text-xs text-gray-500 font-medium">Followers</span>
+                </div>
+                <div className="h-8 w-px bg-gray-200"></div>
+                <div className="flex-1">
+                    <span className="block text-xl font-bold text-gray-900">
+                        {userData.followings?.length || 0}
+                    </span>
+                    <span className="text-xs text-gray-500 font-medium">Following</span>
+                </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="border rounded-lg p-4">
+                    <h3 className="font-semibold mb-3">Followers</h3>
+                    {userData.followers?.length === 0 ? (
+                        <p className="text-sm text-gray-500">No followers yet.</p>
+                    ) : (
+                        userData.followers?.map((user) => (
+                            <div key={user._id} className="py-2 border-b last:border-b-0">
+                                <p className="font-medium text-sm">{user.name}</p>
+                                <p className="text-xs text-gray-500">@{user.username}</p>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div className="border rounded-lg p-4">
+                    <h3 className="font-semibold mb-3">Following</h3>
+                    {userData.followings?.length === 0 ? (
+                        <p className="text-sm text-gray-500">Not following anyone yet.</p>
+                    ) : (
+                        userData.followings?.map((user) => (
+                            <div key={user._id} className="py-2 border-b last:border-b-0">
+                                <p className="font-medium text-sm">{user.name}</p>
+                                <p className="text-xs text-gray-500">@{user.username}</p>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            {isOwnProfile && isEditOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+                    <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+                        <div className="flex items-center justify-between mb-5">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-900">Edit Profile</h2>
+                                <p className="text-sm text-gray-500 mt-1">Update your profile details.</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsEditOpen(false)}
+                                className="text-gray-400 hover:text-gray-700 text-2xl leading-none"
+                                aria-label="Close edit profile"
+                            >
+                                &times;
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleEditSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Profile Picture</label>
+                                <div className="flex items-center gap-4">
+                                    <img
+                                        src={previewImage || userData.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(editForm.name || 'User')}&background=6366f1&color=fff`}
+                                        alt="Profile preview"
+                                        className="w-20 h-20 rounded-full object-cover border-2 border-indigo-100"
+                                    />
+                                    <div>
+                                        <label className="inline-flex cursor-pointer items-center rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">
+                                            Choose Image
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleImageChange}
+                                                className="hidden"
+                                            />
+                                        </label>
+                                        {selectedImage && (
+                                            <p className="mt-2 max-w-xs truncate text-xs text-gray-500">
+                                                {selectedImage.name}
+                                            </p>
+                                        )}
+                                        <p className="mt-1 text-xs text-gray-400">Image upload is UI-only for now.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={editForm.name}
+                                    onChange={handleEditChange}
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                                <input
+                                    type="text"
+                                    name="username"
+                                    value={editForm.username}
+                                    onChange={handleEditChange}
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={editForm.email}
+                                    onChange={handleEditChange}
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+                                <textarea
+                                    name="bio"
+                                    value={editForm.bio}
+                                    onChange={handleEditChange}
+                                    rows="4"
+                                    className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditOpen(false)}
+                                    className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
+                                >
+                                    Save Changes
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                    <PersonList
-                        title={activeList === 'followers' ? 'Followers' : 'Following'}
-                        people={activeList === 'followers' ? userData.followers : userData.following}
-                    />
                 </div>
             )}
         </div>
