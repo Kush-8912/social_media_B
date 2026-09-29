@@ -3,14 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { axiosInstance } from "../axiosCalls/axios";
 
+const getStories = async () => {
+  const response = await axiosInstance.get("/story/getStories");
+  return response.data.stories || [];
+};
 
-const stories = [
-  { name: "Your Story", initials: "You", tone: "from-indigo-500 to-violet-500" },
-  { name: "Ananya", initials: "AN", tone: "from-pink-500 to-rose-500" },
-  { name: "Rohan", initials: "RO", tone: "from-cyan-500 to-blue-500" },
-  { name: "Priya", initials: "PR", tone: "from-amber-400 to-orange-500" },
-  { name: "Arjun", initials: "AR", tone: "from-emerald-400 to-teal-500" },
-];
 
 function Avatar({ initials, tone = "from-slate-700 to-slate-900", size = "h-11 w-11" }) {
   return (
@@ -29,6 +26,14 @@ function Home() {
   const [loading, setLoading] = useState(false);
   const [feedItems, setFeedItems] = useState([]);
   const [fetchingFeed, setFetchingFeed] = useState(true);
+  const [stories, setStories] = useState([]);
+  const [fetchingStories, setFetchingStories] = useState(true);
+  const [storyFormOpen, setStoryFormOpen] = useState(false);
+  const [storyCaption, setStoryCaption] = useState("");
+  const [storyFile, setStoryFile] = useState(null);
+  const [storyPreview, setStoryPreview] = useState("");
+  const [creatingStory, setCreatingStory] = useState(false);
+  const [activeStory, setActiveStory] = useState(null);
 
   const getInitials = (name) =>
     name?.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "U";
@@ -65,6 +70,88 @@ function Home() {
 
     fetchFeed();
   }, []);
+
+  const fetchStories = async () => {
+    try {
+      setStories(await getStories());
+    } catch (error) {
+      console.error("Error fetching stories:", error);
+    } finally {
+      setFetchingStories(false);
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+
+    getStories()
+      .then((fetchedStories) => {
+        if (mounted) setStories(fetchedStories);
+      })
+      .catch((error) => {
+        console.error("Error fetching stories:", error);
+      })
+      .finally(() => {
+        if (mounted) setFetchingStories(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (storyPreview) URL.revokeObjectURL(storyPreview);
+    };
+  }, [storyPreview]);
+
+  const handleStoryFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setStoryFile(file);
+    setStoryPreview(URL.createObjectURL(file));
+  };
+
+  const closeStoryForm = () => {
+    if (creatingStory) return;
+    setStoryFormOpen(false);
+    setStoryCaption("");
+    setStoryFile(null);
+    setStoryPreview("");
+  };
+
+  const handleCreateStory = async (event) => {
+    event.preventDefault();
+
+    if (!storyFile || !storyCaption.trim()) {
+      alert("Please add an image and a caption.");
+      return;
+    }
+
+    try {
+      setCreatingStory(true);
+      const formData = new FormData();
+      formData.append("image", storyFile);
+      formData.append("caption", storyCaption.trim());
+
+      await axiosInstance.post("/story/createStory", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      await fetchStories();
+      setStoryFormOpen(false);
+      setStoryCaption("");
+      setStoryFile(null);
+      setStoryPreview("");
+    } catch (error) {
+      console.error("Error creating story:", error);
+      alert(error.response?.data?.message || "Failed to create story");
+    } finally {
+      setCreatingStory(false);
+    }
+  };
 
   // Handle Like/Unlike with Optimistic UI updates
   const handleToggleLike = async (itemId, type) => {
@@ -219,15 +306,42 @@ function Home() {
               </div>
             </div>
             <div className="flex gap-4 overflow-x-auto border-t border-slate-100 px-5 py-4 scrollbar-hide">
-              {stories.map((story, index) => (
-                <button key={story.name} className="group flex w-[76px] shrink-0 flex-col items-center gap-2">
-                  <div className={`rounded-full bg-gradient-to-br ${story.tone} p-[3px] transition group-hover:scale-105`}>
+              <button
+                type="button"
+                onClick={() => setStoryFormOpen(true)}
+                className="group flex w-[76px] shrink-0 flex-col items-center gap-2"
+              >
+                <div className="relative rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 p-[3px] transition group-hover:scale-105">
+                  <div className="rounded-full bg-white p-[2px]">
+                    <Avatar initials={getInitials(user?.name)} tone="from-indigo-500 to-violet-500" size="h-12 w-12" />
+                  </div>
+                  <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-indigo-600 text-sm font-bold text-white">+</span>
+                </div>
+                <span className="w-full truncate text-center text-[11px] font-semibold text-slate-600">Your Story</span>
+              </button>
+
+              {fetchingStories ? (
+                <div className="flex items-center px-3 text-xs text-slate-400">Loading stories...</div>
+              ) : stories.map((story) => (
+                <button
+                  type="button"
+                  key={story._id}
+                  onClick={() => setActiveStory(story)}
+                  className="group flex w-[76px] shrink-0 flex-col items-center gap-2"
+                >
+                  <div className="rounded-full bg-gradient-to-br from-pink-500 via-violet-500 to-indigo-500 p-[3px] transition group-hover:scale-105">
                     <div className="rounded-full bg-white p-[2px]">
-                      <Avatar initials={index === 0 ? getInitials(user?.name) : story.initials} tone={story.tone} size="h-12 w-12" />
+                      {story.image ? (
+                        <img src={story.image} alt="" className="h-12 w-12 rounded-full object-cover" />
+                      ) : story.author?.profileImage ? (
+                        <img src={story.author.profileImage} alt="" className="h-12 w-12 rounded-full object-cover" />
+                      ) : (
+                        <Avatar initials={getInitials(story.author?.username)} tone="from-pink-500 to-violet-500" size="h-12 w-12" />
+                      )}
                     </div>
                   </div>
                   <span className="w-full truncate text-center text-[11px] font-semibold text-slate-600">
-                    {index === 0 ? "Your Story" : story.name}
+                    {story.author?._id === user?._id ? "You" : story.author?.username || "Story"}
                   </span>
                 </button>
               ))}
@@ -363,6 +477,84 @@ function Home() {
           </div>
         </aside>
       </main>
+
+      {storyFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" onMouseDown={closeStoryForm}>
+          <form
+            onSubmit={handleCreateStory}
+            onMouseDown={(event) => event.stopPropagation()}
+            className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h2 className="text-lg font-black">Create a story</h2>
+                <p className="text-xs text-slate-500">Share an image for the next 24 hours.</p>
+              </div>
+              <button type="button" onClick={closeStoryForm} className="rounded-full px-3 py-2 text-slate-500 hover:bg-slate-100" aria-label="Close">✕</button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <label className="block cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 text-center transition hover:border-indigo-300">
+                {storyPreview ? (
+                  <img src={storyPreview} alt="Story preview" className="h-72 w-full object-cover" />
+                ) : (
+                  <span className="flex h-48 flex-col items-center justify-center gap-2 px-4 text-sm font-semibold text-slate-600">
+                    <span className="text-3xl">▧</span>
+                    Choose an image
+                    <span className="text-xs font-normal text-slate-400">JPG, PNG, GIF or WebP · up to 5 MB</span>
+                  </span>
+                )}
+                <input type="file" accept="image/*" required onChange={handleStoryFileChange} className="hidden" />
+              </label>
+
+              <div>
+                <textarea
+                  value={storyCaption}
+                  onChange={(event) => setStoryCaption(event.target.value)}
+                  maxLength={200}
+                  required
+                  rows={3}
+                  placeholder="Write a caption..."
+                  className="w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                />
+                <p className="mt-1 text-right text-xs text-slate-400">{storyCaption.length}/200</p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={creatingStory || !storyFile || !storyCaption.trim()}
+                className="w-full rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {creatingStory ? "Posting story..." : "Post story"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {activeStory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4" onMouseDown={() => setActiveStory(null)}>
+          <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-slate-900 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent p-4 text-white">
+              <div className="flex items-center gap-3">
+                {activeStory.author?.profileImage ? (
+                  <img src={activeStory.author.profileImage} alt="" className="h-9 w-9 rounded-full object-cover ring-2 ring-white/70" />
+                ) : (
+                  <Avatar initials={getInitials(activeStory.author?.username)} size="h-9 w-9" />
+                )}
+                <span className="text-sm font-bold">@{activeStory.author?.username || "user"}</span>
+              </div>
+              <button type="button" onClick={() => setActiveStory(null)} className="rounded-full bg-black/20 px-3 py-2" aria-label="Close story">✕</button>
+            </div>
+            {activeStory.image && <img src={activeStory.image} alt={activeStory.caption || "Story"} className="max-h-[80vh] min-h-[480px] w-full object-cover" />}
+            {activeStory.caption && (
+              <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-6 pb-6 pt-16 text-center text-sm font-semibold text-white">
+                {activeStory.caption}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
