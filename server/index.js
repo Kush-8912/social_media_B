@@ -9,7 +9,7 @@ import reelRoutes from './routes/reel.routes.js'
 import storyRoutes from './routes/story.routes.js'
 
 const app = express()
-const Port = 8084
+const Port = 8085
 
 dotenv.config()
 
@@ -48,4 +48,10 @@ app.get('/', (req, res) => {
 app.listen(Port, () => {
     console.log(`Server Startet at ${Port}`)
 })
+
+
+
+stories - visible - followers
+
+
 

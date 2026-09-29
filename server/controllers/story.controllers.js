@@ -1,5 +1,6 @@
 import Story from "../models/story.model.js";
 import User from "../models/user.model.js";
+import uploadToCloudinary from "../utils/uploadToCloudinary.js";
 
 
 const STORY_LIFETIME = 24 * 60 * 60 * 1000 // 24hrs - ms
@@ -55,5 +56,16 @@ export const createStory = async (req, res) => {
 
     } catch (error) {
         return res.status(500).json({ message: 'Internal Server Error', error: error })
+    }
+}
+
+// stories - visible - followers
+// Get Stories
+
+export const getStories = (req , res)=>{
+    try {
+        
+    } catch (error) {
+        
     }
 }
