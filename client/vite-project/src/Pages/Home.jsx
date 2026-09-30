@@ -18,7 +18,7 @@ function Avatar({ initials, tone = "from-slate-700 to-slate-900", size = "h-11 w
 }
 
 function Home() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [contentType, setContentType] = useState("post");
   const [caption, setCaption] = useState("");
@@ -42,6 +42,11 @@ function Home() {
 
   const getInitials = (name) =>
     name?.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "U";
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login", { replace: true });
+  };
 
   // Group all active stories by author so one user gets one story bubble.
   // Keep the logged-in user's story group first.
@@ -410,6 +415,13 @@ function Home() {
             >
               <Avatar initials={getInitials(user?.name)} tone="from-indigo-500 to-violet-500" size="h-8 w-8" />
               <span className="hidden text-sm font-semibold sm:block">{user?.name || user?.username || "You"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-full px-3 py-2 text-sm font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            >
+              Logout
             </button>
           </div>
         </div>
