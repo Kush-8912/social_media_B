@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 function Profile() {
     const { username } = useParams()
     const navigate = useNavigate()
-    const { user: loggedInUser, setUser } = useAuth()
+    const { user: loggedInUser, setUser, logout } = useAuth()
     const [userData, setUserData] = useState(null)
     const [loading, setLoading] = useState(true)
     const [isFollowing, setIsFollowing] = useState(false)
@@ -24,6 +24,11 @@ function Profile() {
     const fileInputRef = useRef(null)
 
     const isOwnProfile = loggedInUser?.username === username
+
+    const handleLogout = async () => {
+        await logout()
+        navigate('/login', { replace: true })
+    }
 
     const fetchProfile = async () => {
         const response = await axiosInstance.get(`/users/profile/${username}`)
@@ -276,12 +281,20 @@ function Profile() {
                     <p className="text-sm text-gray-500">{userData.email}</p>
 
                     {isOwnProfile ? (
-                        <button
-                            onClick={openEditProfile}
-                            className="mt-3 px-5 py-2 rounded-lg border border-indigo-600 text-indigo-600 text-sm font-medium hover:bg-indigo-50"
-                        >
-                            Edit Profile
-                        </button>
+                        <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
+                            <button
+                                onClick={openEditProfile}
+                                className="px-5 py-2 rounded-lg border border-indigo-600 text-indigo-600 text-sm font-medium hover:bg-indigo-50"
+                            >
+                                Edit Profile
+                            </button>
+                            <button
+                                onClick={handleLogout}
+                                className="px-5 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50"
+                            >
+                                Logout
+                            </button>
+                        </div>
                     ) : (
                         <button
                             onClick={handleFollowToggle}
