@@ -18,6 +18,9 @@ function Profile() {
     const [error, setError] = useState('')
     const [editError, setEditError] = useState('')
     const [editLoading, setEditLoading] = useState(false)
+    const [profilePosts, setProfilePosts] = useState([])
+    const [postsLoading, setPostsLoading] = useState(true)
+    const [postsError, setPostsError] = useState('')
     const fileInputRef = useRef(null)
 
     const isOwnProfile = loggedInUser?.username === username
@@ -33,12 +36,31 @@ function Profile() {
         const loadProfile = async () => {
             try {
                 setLoading(true)
+                setPostsLoading(true)
                 setError('')
+                setPostsError('')
 
                 const profile = await fetchProfile()
                 if (!mounted) return
 
                 setUserData(profile)
+
+                try {
+                    const postsResponse = await axiosInstance.get(`/post/user/${username}`)
+                    if (mounted) {
+                        setProfilePosts(postsResponse.data.posts || [])
+                    }
+                } catch (postsRequestError) {
+                    console.error('Failed to fetch profile posts:', postsRequestError)
+                    if (mounted) {
+                        setProfilePosts([])
+                        setPostsError(
+                            postsRequestError.response?.data?.message || 'Failed to load posts.'
+                        )
+                    }
+                } finally {
+                    if (mounted) setPostsLoading(false)
+                }
 
                 if (isOwnProfile) {
                     setIsFollowing(false)
@@ -61,7 +83,10 @@ function Profile() {
                     setError(requestError.response?.data?.message || 'Failed to load profile.')
                 }
             } finally {
-                if (mounted) setLoading(false)
+                if (mounted) {
+                    setLoading(false)
+                    setPostsLoading(false)
+                }
             }
         }
 
@@ -279,7 +304,7 @@ function Profile() {
             <div className="flex justify-around items-center pt-4 border-t border-gray-100 text-center">
                 <div className="flex-1">
                     <span className="block text-xl font-bold text-gray-900">
-                        {userData.posts?.length ?? userData.postsCount ?? 0}
+                        {profilePosts.length}
                     </span>
                     <span className="text-xs text-gray-500 font-medium">Posts</span>
                 </div>
@@ -297,6 +322,56 @@ function Profile() {
                     </span>
                     <span className="text-xs text-gray-500 font-medium">Following</span>
                 </div>
+            </div>
+
+            <div className="mt-6 border-t border-gray-100 pt-6">
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-sm font-bold text-gray-900">Posts</h2>
+                    <span className="text-xs text-gray-400">{profilePosts.length} total</span>
+                </div>
+
+                {postsLoading ? (
+                    <div className="py-10 text-center text-sm text-gray-500">
+                        Loading posts...
+                    </div>
+                ) : postsError ? (
+                    <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+                        {postsError}
+                    </div>
+                ) : profilePosts.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-gray-200 py-10 text-center text-sm text-gray-500">
+                        No posts yet.
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {profilePosts.map((post) => (
+                            <article
+                                key={post._id}
+                                className="group overflow-hidden rounded-xl border border-gray-100 bg-gray-50"
+                            >
+                                {post.image ? (
+                                    <img
+                                        src={post.image}
+                                        alt={post.caption || 'Post'}
+                                        className="aspect-square w-full object-cover transition duration-200 group-hover:scale-[1.02]"
+                                    />
+                                ) : (
+                                    <div className="flex aspect-square items-center justify-center px-4 text-center text-sm text-gray-500">
+                                        {post.caption || 'Post'}
+                                    </div>
+                                )}
+
+                                {post.caption && post.image && (
+                                    <div className="p-3">
+                                        <p className="line-clamp-2 text-xs leading-5 text-gray-600">
+                                            {post.caption}
+                                        </p>
+                                    </div>
+                                )}
+                            </article>
+                        ))}
+                    </div>
+                )}
             </div>
 
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
