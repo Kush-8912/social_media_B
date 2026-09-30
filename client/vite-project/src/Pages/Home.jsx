@@ -34,6 +34,11 @@ function Home() {
   const [storyPreview, setStoryPreview] = useState("");
   const [creatingStory, setCreatingStory] = useState(false);
   const [activeStory, setActiveStory] = useState(null);
+  const [openComments, setOpenComments] = useState({});
+  const [commentsByItem, setCommentsByItem] = useState({});
+  const [commentInputs, setCommentInputs] = useState({});
+  const [commentLoading, setCommentLoading] = useState({});
+  const [interactionError, setInteractionError] = useState({});
 
   const getInitials = (name) =>
     name?.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "U";
@@ -153,11 +158,10 @@ function Home() {
     }
   };
 
+  const getItemKey = (type, id) => `${type}-${id}`;
+
   // Handle Like/Unlike with Optimistic UI updates
   const handleToggleLike = async (itemId, type) => {
-    if (type !== "post") return; // Extend to reels when reel like endpoint is ready
-
-    // Save previous state for rollback on error
     const previousItems = [...feedItems];
 
     setFeedItems((prevItems) =>
@@ -176,18 +180,17 @@ function Home() {
     );
 
     try {
-      const response = await axiosInstance.post(`/post/like/${itemId}`);
-      const { likes } = response.data;
+      const response = await axiosInstance.post(`/${type}/like/${itemId}`);
+      const { likes, likesCount } = response.data;
 
-      console.log(response)
-
-      // Sync backend like array length
+      // Sync backend like data
       setFeedItems((prevItems) =>
         prevItems.map((item) => {
           if (item._id === itemId) {
             return {
               ...item,
-              likesCount: likes,
+              likes: Array.isArray(likes) ? likes : item.likes,
+              likesCount: likesCount ?? (Array.isArray(likes) ? likes.length : item.likes?.length || 0),
             };
           }
           return item;
@@ -196,6 +199,75 @@ function Home() {
     } catch (error) {
       console.error("Error toggling like:", error);
       setFeedItems(previousItems); // Rollback on API error
+    }
+  };
+
+  const handleToggleComments = async (type, id) => {
+    const key = getItemKey(type, id);
+    const willOpen = !openComments[key];
+
+    setOpenComments((prev) => ({ ...prev, [key]: willOpen }));
+    if (!willOpen || commentsByItem[key] !== undefined) return;
+
+    try {
+      setCommentLoading((prev) => ({ ...prev, [key]: true }));
+      setInteractionError((prev) => ({ ...prev, [key]: "" }));
+      const response = await axiosInstance.get(`/comment/${type}/${id}`);
+      setCommentsByItem((prev) => ({
+        ...prev,
+        [key]: response.data.comments || [],
+      }));
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      setInteractionError((prev) => ({
+        ...prev,
+        [key]: error.response?.data?.message || "Unable to load comments.",
+      }));
+    } finally {
+      setCommentLoading((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleAddComment = async (event, type, id) => {
+    event.preventDefault();
+    const key = getItemKey(type, id);
+    const text = commentInputs[key]?.trim();
+    if (!text) return;
+
+    try {
+      setCommentLoading((prev) => ({ ...prev, [key]: true }));
+      setInteractionError((prev) => ({ ...prev, [key]: "" }));
+      const response = await axiosInstance.post(`/comment/${type}/${id}`, { text });
+      setCommentsByItem((prev) => ({
+        ...prev,
+        [key]: [...(prev[key] || []), response.data.comment],
+      }));
+      setCommentInputs((prev) => ({ ...prev, [key]: "" }));
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      setInteractionError((prev) => ({
+        ...prev,
+        [key]: error.response?.data?.message || "Unable to add comment.",
+      }));
+    } finally {
+      setCommentLoading((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleDeleteComment = async (commentId, type, id) => {
+    const key = getItemKey(type, id);
+    try {
+      await axiosInstance.delete(`/comment/${commentId}`);
+      setCommentsByItem((prev) => ({
+        ...prev,
+        [key]: (prev[key] || []).filter((comment) => comment._id !== commentId),
+      }));
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      setInteractionError((prev) => ({
+        ...prev,
+        [key]: error.response?.data?.message || "Unable to delete comment.",
+      }));
     }
   };
 
@@ -442,7 +514,11 @@ function Home() {
                       {item.caption && <p className="text-sm text-slate-700 mb-3">{item.caption}</p>}
                       <div className="flex items-center justify-between text-xs text-slate-400">
                         <span>{likesCount} {likesCount === 1 ? "like" : "likes"}</span>
-                        <span>0 comments</span>
+                        <span>
+                          {commentsByItem[getItemKey(item.type, item._id)] !== undefined
+                            ? `${commentsByItem[getItemKey(item.type, item._id)].length} comments`
+                            : "Comments"}
+                        </span>
                       </div>
                       <div className="mt-4 flex border-t border-slate-100 pt-3">
                         <button
@@ -455,9 +531,74 @@ function Home() {
                         >
                           {isLiked ? "♥ Liked" : "♡ Like"}
                         </button>
-                        <button className="flex-1 rounded-xl py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">◌ Comment</button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleComments(item.type, item._id)}
+                          className="flex-1 rounded-xl py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                        >
+                          ◌ {openComments[getItemKey(item.type, item._id)] ? "Hide Comments" : "Comment"}
+                        </button>
                         <button className="flex-1 rounded-xl py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">↗ Share</button>
                       </div>
+
+                      {interactionError[getItemKey(item.type, item._id)] && (
+                        <p className="mt-2 text-xs text-red-500">
+                          {interactionError[getItemKey(item.type, item._id)]}
+                        </p>
+                      )}
+
+                      {openComments[getItemKey(item.type, item._id)] && (
+                        <div className="mt-4 border-t border-slate-100 pt-4">
+                          <div className="space-y-3">
+                            {(commentsByItem[getItemKey(item.type, item._id)] || []).map((comment) => (
+                              <div key={comment._id} className="flex items-start gap-3">
+                                <Avatar initials={getInitials(comment.user?.name)} tone="from-slate-500 to-slate-700" size="h-8 w-8" />
+                                <div className="min-w-0 flex-1 rounded-2xl bg-slate-50 px-3 py-2">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <p className="text-xs font-bold text-slate-700">{comment.user?.name || "Unknown User"}</p>
+                                    {comment.user?._id === user?._id && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteComment(comment._id, item.type, item._id)}
+                                        className="text-[11px] font-semibold text-slate-400 hover:text-red-500"
+                                      >
+                                        Delete
+                                      </button>
+                                    )}
+                                  </div>
+                                  <p className="mt-0.5 break-words text-sm text-slate-600">{comment.text}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          <form
+                            onSubmit={(event) => handleAddComment(event, item.type, item._id)}
+                            className="mt-4 flex items-center gap-2"
+                          >
+                            <input
+                              type="text"
+                              value={commentInputs[getItemKey(item.type, item._id)] || ""}
+                              onChange={(event) =>
+                                setCommentInputs((prev) => ({
+                                  ...prev,
+                                  [getItemKey(item.type, item._id)]: event.target.value,
+                                }))
+                              }
+                              maxLength={500}
+                              placeholder="Write a comment..."
+                              className="min-w-0 flex-1 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none"
+                            />
+                            <button
+                              type="submit"
+                              disabled={commentLoading[getItemKey(item.type, item._id)]}
+                              className="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                            >
+                              Post
+                            </button>
+                          </form>
+                        </div>
+                      )}
                     </div>
                   </article>
                 );
