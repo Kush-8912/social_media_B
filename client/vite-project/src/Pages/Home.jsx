@@ -43,6 +43,71 @@ function Home() {
   const getInitials = (name) =>
     name?.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "U";
 
+  // Group all active stories by author so one user gets one story bubble.
+  // Keep the logged-in user's story group first.
+  const storyGroups = Object.values(
+    stories.reduce((groups, story) => {
+      const authorId = story.author?._id;
+      if (!authorId) return groups;
+
+      if (!groups[authorId]) {
+        groups[authorId] = {
+          author: story.author,
+          stories: [],
+        };
+      }
+
+      groups[authorId].stories.push(story);
+      return groups;
+    }, {})
+  )
+    .map((group) => ({
+      ...group,
+      stories: [...group.stories].sort(
+        (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+      ),
+    }))
+    .sort((a, b) => {
+      const aIsCurrentUser = a.author?._id === user?._id;
+      const bIsCurrentUser = b.author?._id === user?._id;
+
+      if (aIsCurrentUser && !bIsCurrentUser) return -1;
+      if (!aIsCurrentUser && bIsCurrentUser) return 1;
+
+      const aLatest = a.stories[a.stories.length - 1]?.createdAt;
+      const bLatest = b.stories[b.stories.length - 1]?.createdAt;
+      return new Date(bLatest) - new Date(aLatest);
+    });
+
+  const openStoryGroup = (group) => {
+    setActiveStory({
+      group,
+      index: 0,
+    });
+  };
+
+  const showNextStory = () => {
+    if (!activeStory) return;
+
+    if (activeStory.index < activeStory.group.stories.length - 1) {
+      setActiveStory((current) => ({
+        ...current,
+        index: current.index + 1,
+      }));
+    } else {
+      setActiveStory(null);
+    }
+  };
+
+  const showPreviousStory = () => {
+    if (!activeStory || activeStory.index === 0) return;
+
+    setActiveStory((current) => ({
+      ...current,
+      index: current.index - 1,
+    }));
+  };
+
   useEffect(() => {
     const fetchFeed = async () => {
       try {
@@ -394,29 +459,39 @@ function Home() {
 
               {fetchingStories ? (
                 <div className="flex items-center px-3 text-xs text-slate-400">Loading stories...</div>
-              ) : stories.map((story) => (
-                <button
-                  type="button"
-                  key={story._id}
-                  onClick={() => setActiveStory(story)}
-                  className="group flex w-[76px] shrink-0 flex-col items-center gap-2"
-                >
-                  <div className="rounded-full bg-gradient-to-br from-pink-500 via-violet-500 to-indigo-500 p-[3px] transition group-hover:scale-105">
-                    <div className="rounded-full bg-white p-[2px]">
-                      {story.image ? (
-                        <img src={story.image} alt="" className="h-12 w-12 rounded-full object-cover" />
-                      ) : story.author?.profileImage ? (
-                        <img src={story.author.profileImage} alt="" className="h-12 w-12 rounded-full object-cover" />
-                      ) : (
-                        <Avatar initials={getInitials(story.author?.username)} tone="from-pink-500 to-violet-500" size="h-12 w-12" />
+              ) : storyGroups.map((group) => {
+                const latestStory = group.stories[group.stories.length - 1];
+                const isCurrentUser = group.author?._id === user?._id;
+
+                return (
+                  <button
+                    type="button"
+                    key={group.author?._id}
+                    onClick={() => openStoryGroup(group)}
+                    className="group flex w-[76px] shrink-0 flex-col items-center gap-2"
+                  >
+                    <div className="relative rounded-full bg-gradient-to-br from-pink-500 via-violet-500 to-indigo-500 p-[3px] transition group-hover:scale-105">
+                      <div className="rounded-full bg-white p-[2px]">
+                        {group.author?.profileImage ? (
+                          <img src={group.author.profileImage} alt="" className="h-12 w-12 rounded-full object-cover" />
+                        ) : latestStory?.image ? (
+                          <img src={latestStory.image} alt="" className="h-12 w-12 rounded-full object-cover" />
+                        ) : (
+                          <Avatar initials={getInitials(group.author?.username)} tone="from-pink-500 to-violet-500" size="h-12 w-12" />
+                        )}
+                      </div>
+                      {group.stories.length > 1 && (
+                        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-slate-900 px-1 text-[9px] font-bold text-white">
+                          {group.stories.length}
+                        </span>
                       )}
                     </div>
-                  </div>
-                  <span className="w-full truncate text-center text-[11px] font-semibold text-slate-600">
-                    {story.author?._id === user?._id ? "You" : story.author?.username || "Story"}
-                  </span>
-                </button>
-              ))}
+                    <span className="w-full truncate text-center text-[11px] font-semibold text-slate-600">
+                      {isCurrentUser ? "You" : group.author?.username || "Story"}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -673,29 +748,67 @@ function Home() {
         </div>
       )}
 
-      {activeStory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4" onMouseDown={() => setActiveStory(null)}>
-          <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-slate-900 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent p-4 text-white">
-              <div className="flex items-center gap-3">
-                {activeStory.author?.profileImage ? (
-                  <img src={activeStory.author.profileImage} alt="" className="h-9 w-9 rounded-full object-cover ring-2 ring-white/70" />
-                ) : (
-                  <Avatar initials={getInitials(activeStory.author?.username)} size="h-9 w-9" />
-                )}
-                <span className="text-sm font-bold">@{activeStory.author?.username || "user"}</span>
+      {activeStory && (() => {
+        const currentStory = activeStory.group.stories[activeStory.index];
+        const author = activeStory.group.author;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4" onMouseDown={() => setActiveStory(null)}>
+            <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-slate-900 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+              <div className="absolute inset-x-0 top-0 z-20 p-3">
+                <div className="mb-3 flex gap-1">
+                  {activeStory.group.stories.map((story, index) => (
+                    <div key={story._id} className="h-1 flex-1 overflow-hidden rounded-full bg-white/30">
+                      <div className={`h-full bg-white ${index <= activeStory.index ? "w-full" : "w-0"}`} />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between text-white">
+                  <div className="flex items-center gap-3">
+                    {author?.profileImage ? (
+                      <img src={author.profileImage} alt="" className="h-9 w-9 rounded-full object-cover ring-2 ring-white/70" />
+                    ) : (
+                      <Avatar initials={getInitials(author?.username)} size="h-9 w-9" />
+                    )}
+                    <div>
+                      <span className="text-sm font-bold">@{author?.username || "user"}</span>
+                      <p className="text-[10px] text-white/70">
+                        {activeStory.index + 1} / {activeStory.group.stories.length}
+                      </p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setActiveStory(null)} className="rounded-full bg-black/20 px-3 py-2" aria-label="Close story">✕</button>
+                </div>
               </div>
-              <button type="button" onClick={() => setActiveStory(null)} className="rounded-full bg-black/20 px-3 py-2" aria-label="Close story">✕</button>
+
+              {currentStory?.image && (
+                <img src={currentStory.image} alt={currentStory.caption || "Story"} className="max-h-[80vh] min-h-[480px] w-full object-cover" />
+              )}
+
+              <button
+                type="button"
+                onClick={showPreviousStory}
+                disabled={activeStory.index === 0}
+                className="absolute bottom-0 left-0 top-20 z-10 w-1/3 cursor-pointer disabled:cursor-default"
+                aria-label="Previous story"
+              />
+              <button
+                type="button"
+                onClick={showNextStory}
+                className="absolute bottom-0 right-0 top-20 z-10 w-1/3 cursor-pointer"
+                aria-label="Next story"
+              />
+
+              {currentStory?.caption && (
+                <p className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/80 to-transparent px-6 pb-6 pt-16 text-center text-sm font-semibold text-white">
+                  {currentStory.caption}
+                </p>
+              )}
             </div>
-            {activeStory.image && <img src={activeStory.image} alt={activeStory.caption || "Story"} className="max-h-[80vh] min-h-[480px] w-full object-cover" />}
-            {activeStory.caption && (
-              <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-6 pb-6 pt-16 text-center text-sm font-semibold text-white">
-                {activeStory.caption}
-              </p>
-            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
