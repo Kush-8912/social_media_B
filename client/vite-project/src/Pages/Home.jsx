@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { axiosInstance } from "../axiosCalls/axios";
+import { useDispatch } from "react-redux";
+import { setPosts } from "../redux/postSlice";
+
+
 
 const getStories = async () => {
   const response = await axiosInstance.get("/story/getStories");
@@ -39,6 +43,8 @@ function Home() {
   const [commentInputs, setCommentInputs] = useState({});
   const [commentLoading, setCommentLoading] = useState({});
   const [interactionError, setInteractionError] = useState({});
+
+  const dispatch = useDispatch()
 
   const getInitials = (name) =>
     name?.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "U";
@@ -125,6 +131,12 @@ function Home() {
           ...post,
           type: "post",
         }));
+
+        dispatch(setPosts(posts))
+
+
+
+
 
         const reels = (reelsRes.data.reels || []).map((reel) => ({
           ...reel,

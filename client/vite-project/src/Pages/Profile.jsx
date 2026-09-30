@@ -2,8 +2,17 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { axiosInstance } from '../axiosCalls/axios'
 import { useAuth } from '../context/AuthContext'
+import { useSelector } from 'react-redux'
+
+
 
 function Profile() {
+
+  const posts =  useSelector(state => state.posts.items)
+
+  console.log(posts)
+
+
     const { username } = useParams()
     const navigate = useNavigate()
     const { user: loggedInUser, setUser, logout } = useAuth()
