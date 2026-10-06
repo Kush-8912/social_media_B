@@ -5,6 +5,8 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createServer } from "http";
+import { Server } from "socket.io";
 
 import userRoutes from "./routes/user.routes.js";
 import postRoutes from "./routes/post.routes.js";
@@ -36,7 +38,35 @@ if (missingEnvVars.length > 0) {
 }
 
 const app = express();
+const httpServer = createServer(app);
+
+
+const io = new Server(httpServer, {
+    cors: {
+        origin: "http://localhost:5173",
+        credentials: true
+    }
+});
+
+io.on("connection", (socket) => {
+    console.log("User connected:", socket.id);
+
+    socket.on("disconnect", () => {
+        console.log("User disconnected:", socket.id);
+    });
+});
+
+
+
+
+
+
 const port = 8084;
+
+
+
+
+
 
 mongoose.connect(process.env.dbURL)
     .then(() => {
@@ -62,6 +92,7 @@ app.use("/stories", storyRoutes);
 
 app.use(errorMiddleware);
 
-app.listen(port, () => {
+
+httpServer.listen(port, () => {
     console.log(`Server Started at ${port}`);
 });
