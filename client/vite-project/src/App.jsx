@@ -8,9 +8,26 @@ import { AuthProvider } from './context/AuthContext'
 import PublicRoute from './components/PublicRoute'
 import ProtectedRoute from './components/ProtectedRoute'
 import Profile from './pages/Profile'
+import socket from './socket.js'
+import { useEffect } from 'react'
 
 
 function App() {
+
+  useEffect(() => {
+    const handleConnect = () => {
+      console.log("Socket connected:", socket.id);
+    };
+
+    socket.on("connect", handleConnect);
+
+    socket.connect();
+
+  }, [])
+
+
+
+
 
 
   return (
