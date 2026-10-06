@@ -1,21 +1,38 @@
-import express from 'express'
-import { isAuthenticated } from '../middlewares/authMiddleware.js'
-import { createPost, getAllPosts, getPostsByUsername, toggleLike } from '../controllers/post.controllers.js'
-import upload from '../middlewares/upload.middlerware.js'
+import express from "express";
+import {
+    createPost,
+    getFeed,
+    getPostsByUsername,
+    togglePostLike
+} from "../controllers/post.controllers.js";
+import isAuthenticated from "../middlewares/authMiddleware.js";
+import upload from "../middlewares/upload.middleware.js";
 
+const postRoutes = express.Router();
 
+postRoutes.post(
+    "/",
+    isAuthenticated,
+    upload.single("image"),
+    createPost
+);
 
+postRoutes.get(
+    "/feed",
+    isAuthenticated,
+    getFeed
+);
 
-const postRoutes = express.Router()
+postRoutes.get(
+    "/user/:username",
+    isAuthenticated,
+    getPostsByUsername
+);
 
+postRoutes.patch(
+    "/:id/like",
+    isAuthenticated,
+    togglePostLike
+);
 
-postRoutes.post('/createPost' , isAuthenticated ,upload.single('image') , createPost  )
-postRoutes.get('/getAllPosts' ,isAuthenticated , getAllPosts)
-postRoutes.get('/user/:username', isAuthenticated, getPostsByUsername)
-postRoutes.post('/like/:id' ,isAuthenticated,  toggleLike)
-
-
-
-
-
-export default postRoutes
+export default postRoutes;
