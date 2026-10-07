@@ -51,6 +51,17 @@ const io = new Server(httpServer, {
 io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
+    // recieve and reply back to the client
+    socket.on("follow", (data) => {
+        console.log("Message from client:", data);
+        socket.emit("server-reply", {
+            message: "Hello Client, I received your message"
+        });
+
+    });
+
+
+
     socket.on("disconnect", () => {
         console.log("User disconnected:", socket.id);
     });

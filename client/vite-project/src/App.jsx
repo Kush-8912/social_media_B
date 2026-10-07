@@ -15,15 +15,58 @@ import { useEffect } from 'react'
 function App() {
 
   useEffect(() => {
+
+    // Runs when connection is successfully established
     const handleConnect = () => {
       console.log("Socket connected:", socket.id);
     };
 
-    socket.on("connect", handleConnect);
 
+    // VERY IMPORTANT FOR DEBUGGING
+    // Runs when connection fails
+    const handleConnectError = (error) => {
+      console.log("Socket connection error:", error.message);
+      console.log(error);
+    };
+
+
+    const handleDisconnect = (reason) => {
+      console.log("Socket disconnected:", reason);
+    };
+
+    socket.emit("follow", {
+      message: "Hello Server"
+    });
+
+    socket.on("server-reply", (data) => {
+      console.log("Reply from server:", data);
+    });
+
+
+    // Register listeners BEFORE connecting
+    socket.on("connect", handleConnect);
+    socket.on("connect_error", handleConnectError);
+    socket.on("disconnect", handleDisconnect);
+
+    // Send a message from the client to server
+
+
+
+    // Now start the connection
     socket.connect();
 
-  }, [])
+
+    // Cleanup
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("connect_error", handleConnectError);
+      socket.off("disconnect", handleDisconnect);
+
+      socket.disconnect();
+    };
+
+  }, []);
+
 
 
 
