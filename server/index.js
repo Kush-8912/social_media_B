@@ -14,6 +14,7 @@ import reelRoutes from "./routes/reel.routes.js";
 import commentRoutes from "./routes/comment.routes.js";
 import storyRoutes from "./routes/story.routes.js";
 import errorMiddleware from "./middlewares/error.middleware.js";
+import notificationRoutes from "./routes/notification.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -100,6 +101,7 @@ app.use("/posts", postRoutes);
 app.use("/reels", reelRoutes);
 app.use("/comments", commentRoutes);
 app.use("/stories", storyRoutes);
+app.use("/notification", notificationRoutes);
 
 app.use(errorMiddleware);
 

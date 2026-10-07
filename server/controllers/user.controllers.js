@@ -2,6 +2,7 @@ import User from "../models/user.model.js";
 import bcrypt from "bcrypt";
 import generateToken from "../utils/generateToken.js";
 import uploadToCloudinary from "../utils/uploadToCloudinary.js";
+import Notification from "../models/notification.model.js";
 
 const cookieOptions = {
     httpOnly: true,
@@ -127,18 +128,98 @@ export const testFileUpload = async (req, res, next) => {
 
 export const followUser = async (req, res) => {
     try {
+
+        // The logged-in user who is performing the follow
         const currentUserId = req.user._id;
+
+        // The user whom we want to follow
         const targetUserId = req.params.id;
-        if (currentUserId.toString() === targetUserId.toString()) return res.status(409).json({ message: "You cannot follow yourself" });
+
+
+        // A user should not be able to follow themselves
+        if (currentUserId.toString() === targetUserId.toString()) {
+            return res.status(409).json({
+                message: "You cannot follow yourself"
+            });
+        }
+
+
+        // Check whether the target user actually exists
         const targetUser = await User.findById(targetUserId);
-        if (!targetUser) return res.status(404).json({ message: "No Target User Found" });
-        if (targetUser.followers.some((id) => id.toString() === currentUserId.toString())) return res.status(409).json({ message: "You are already following this user" });
-        await User.findByIdAndUpdate(currentUserId, { $addToSet: { followings: targetUserId } });
-        await User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUserId } });
-        return res.status(200).json({ message: "User followed" });
+
+        if (!targetUser) {
+            return res.status(404).json({
+                message: "No Target User Found"
+            });
+        }
+
+
+        // Check whether the current user already follows the target user
+        const alreadyFollowing = targetUser.followers.some(
+            (id) => id.toString() === currentUserId.toString()
+        );
+
+        if (alreadyFollowing) {
+            return res.status(409).json({
+                message: "You are already following this user"
+            });
+        }
+
+
+        // Add target user to current user's following list
+        await User.findByIdAndUpdate(
+            currentUserId,
+            {
+                $addToSet: {
+                    followings: targetUserId
+                }
+            }
+        );
+
+
+        // Add current user to target user's followers list
+        await User.findByIdAndUpdate(
+            targetUserId,
+            {
+                $addToSet: {
+                    followers: currentUserId
+                }
+            }
+        );
+
+
+        // ---------------------------------------------
+        // NEW PART: CREATE THE NOTIFICATION
+        // ---------------------------------------------
+
+        const notification = await Notification.create({
+
+            // Who performed the follow?
+            sender: currentUserId,
+
+            // Who should receive the notification?
+            receiver: targetUserId,
+
+            // What happened?
+            type: "follow"
+        });
+
+
+        return res.status(200).json({
+            message: "User followed",
+
+            // Temporarily returning this so we can easily
+            // verify that our notification was created
+            notification
+        });
+
     } catch (error) {
+
         console.log(error);
-        return res.status(500).json({ message: "Internal Server Error" });
+
+        return res.status(500).json({
+            message: "Internal Server Error"
+        });
     }
 };
 
